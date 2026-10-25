@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Floating Player</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" alt="" width="20" height="20">
+    <h1>Floating Player</h1>
+  </header>
+
+  <button id="popout" class="primary" type="button" disabled>Pop out</button>
+  <button id="float" class="secondary" type="button" disabled>Float in page</button>
+  <p id="status" role="status">Looking for a video…</p>
+
+  <div class="options">
+    <label class="option" id="autoPip-row">
+      <input type="checkbox" id="autoPip">
+      <span>Pop out when I switch tabs</span>
+    </label>
+    <label class="option">
+      <input type="checkbox" id="autoFloat">
+      <span>Float in page when I scroll past a playing video</span>
+    </label>
+  </div>
+
+  <p class="hint" id="shortcut-hint">
+    Pop out: <kbd id="key-pop-out">not set</kbd><br>
+    Float in page: <kbd id="key-float">not set</kbd>
+    <a href="#" id="shortcuts">change</a>
+  </p>
+
+  <script src="send.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

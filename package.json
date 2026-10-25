@@ -1,0 +1,15 @@
+{
+  "name": "floating-player",
+  "private": true,
+  "type": "module",
+  "description": "Browser extension that pops website videos out into a floating player (Chrome and Safari).",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "package": "node scripts/build.mjs --zip",
+    "test": "node scripts/build.mjs && node tests/e2e.mjs",
+    "safari": "node scripts/build.mjs && xcodebuild -project \"safari/Floating Player/Floating Player.xcodeproj\" -scheme \"Floating Player\" -configuration Release build"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

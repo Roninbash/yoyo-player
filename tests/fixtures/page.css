@@ -1,0 +1,4 @@
+body { margin: 0; font-family: sans-serif; }
+main { padding: 20px; }
+video { display: block; width: 640px; height: 360px; background: #222; }
+.spacer { height: 3000px; background: linear-gradient(#eee, #99c); }

@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Floating Player",
+  "version": "1.0.0",
+  "description": "Pop videos out into a floating player that stays on top of all your apps \u2014 YouTube, Netflix, Prime Video, embeds and more.",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Floating Player",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "commands": {
+    "pop-out": {
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
+      "description": "Pop the video out of the browser / bring it back"
+    },
+    "float": {
+      "suggested_key": {
+        "default": "Alt+Shift+F"
+      },
+      "description": "Float the video over the page / put it back"
+    }
+  }
+}
