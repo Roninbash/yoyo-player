@@ -1,6 +1,6 @@
-# Privacy Policy — Floating Player
+# Privacy Policy — YoYo Player
 
-Floating Player does not collect, send or sell any data.
+YoYo Player does not collect, send or sell any data.
 
 - **No tracking or analytics.** The extension makes no network requests.
 - **What it stores:** your settings (the two automatic-mode switches) and the floating player's last position and size. This is saved with the browser's extension storage on your device. If browser sync is turned on, the browser may sync your settings between your devices.

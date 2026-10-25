@@ -1,4 +1,6 @@
-# Floating Player
+<p align="center"><img src="assets/logo.png" alt="YoYo Player logo" width="128"></p>
+
+# YoYo Player
 
 A browser extension for Chrome and Safari that pops a website's video out into a floating player. It works with YouTube, Netflix, Prime Video, Disney+, Twitch, embedded players and most other sites. It has two modes:
 
@@ -43,11 +45,14 @@ Requirements: Node 18+. For Safari, also Xcode 15+.
 
 ```
 src/            extension source (src/manifest.json is the Chrome manifest)
-scripts/        build script
+scripts/        build script and icon generator
 tests/          end-to-end tests and fixture pages
 safari/         Xcode project that wraps the extension as a Mac app
+assets/         full-size logo
 dist/           build output (generated)
 ```
+
+The icons are drawn by `scripts/make-icons.py`. To change the logo, edit it and run `python3 scripts/make-icons.py` (needs `pip install Pillow`). It updates the extension icons, `assets/logo.png` and the Mac app icons.
 
 | Command | What it does |
 |---|---|
@@ -69,10 +74,10 @@ You can also load `src/` directly while developing.
 ### Load in Safari
 
 1. `npm run build`
-2. Open `safari/Floating Player/Floating Player.xcodeproj` in Xcode and press **Run** (⌘R). This installs the Floating Player app and its extension.
+2. Open `safari/YoYo Player/YoYo Player.xcodeproj` in Xcode and press **Run** (⌘R). This installs the YoYo Player app and its extension.
 3. In Safari, open **Settings → Advanced** and turn on **Show features for web developers**.
 4. Open **Settings → Developer** and turn on **Allow unsigned extensions**. Safari turns this off again every time it quits.
-5. Open **Settings → Extensions**, turn on **Floating Player**, and allow it on all websites (or the sites you want).
+5. Open **Settings → Extensions**, turn on **YoYo Player**, and allow it on all websites (or the sites you want).
 6. After changing code, run `npm run build` and press **Run** in Xcode again.
 
 The Xcode project reads its files from `dist/safari`. If you add a new file to `src/`, also add it to the extension target in Xcode (drag it from `dist/safari` into the **Resources** group).
@@ -82,7 +87,7 @@ The Xcode project reads its files from `dist/safari`. If you add a new file to `
 ### Chrome Web Store
 
 1. Bump `version` in `src/manifest.json`.
-2. `npm run package`, then upload `dist/floating-player-chrome-<version>.zip` in the [developer dashboard](https://chrome.google.com/webstore/devconsole) (one-time $5 registration).
+2. `npm run package`, then upload `dist/yoyo-player-chrome-<version>.zip` in the [developer dashboard](https://chrome.google.com/webstore/devconsole) (one-time $5 registration).
 3. Permission justifications for the review form:
    - **Access to all sites** (content script): finds the video on the page and runs the floating player and the scroll and tab-switch triggers.
    - **scripting / activeTab:** runs the pop-out and float actions in the current tab from the toolbar button or shortcut.
@@ -93,9 +98,9 @@ The Xcode project reads its files from `dist/safari`. If you add a new file to `
 
 Requires an Apple Developer Program membership ($99/year).
 
-1. Replace the placeholder bundle IDs with your own (for example `com.yourname.FloatingPlayer`):
-   - In Xcode, select each target and change **General → Identity → Bundle Identifier**. The app is `com.example.FloatingPlayer` and the extension is `com.example.FloatingPlayer.Extension`; the extension's ID must start with the app's.
-   - Update `extensionBundleIdentifier` in `safari/Floating Player/Floating Player/ViewController.swift` to match the extension's new ID.
+1. Replace the placeholder bundle IDs with your own (for example `com.yourname.YoYoPlayer`):
+   - In Xcode, select each target and change **General → Identity → Bundle Identifier**. The app is `com.example.YoYoPlayer` and the extension is `com.example.YoYoPlayer.Extension`; the extension's ID must start with the app's.
+   - Update `extensionBundleIdentifier` in `safari/YoYo Player/YoYo Player/ViewController.swift` to match the extension's new ID.
 2. In each target's **Signing & Capabilities**, choose your team.
 3. Set the version under **General → Identity** to match `src/manifest.json`.
 4. **Product → Archive**, then **Distribute App → App Store Connect**.
@@ -107,3 +112,7 @@ You can also distribute outside the App Store by choosing **Developer ID** when 
 - An embed can't float in the page if the site has wrapped it in certain visual effects (CSS transforms or filters), because those stop it being pinned in place. Pop out still works.
 - While the video is out of the page, the site's own controls (like YouTube's control bar) aren't shown on it. The site's keyboard shortcuts still work in its tab.
 - The tests can't confirm that a toolbar click or shortcut counts as a user click in the page (the test tool fakes that automatically). Test this in a real browser before each release.
+
+## License
+
+[MIT](LICENSE). You're free to use, change and share this code, including in commercial projects, as long as you keep the license notice.

@@ -14,7 +14,7 @@ const api = globalThis.browser ?? globalThis.chrome;
 async function frameStates(tabId) {
   const query = () => api.scripting.executeScript({
     target: { tabId, allFrames: true },
-    func: () => window.__floatingPlayer?.status() ?? null,
+    func: () => window.__yoyoPlayer?.status() ?? null,
   });
   try {
     let results = await query();
@@ -55,7 +55,7 @@ async function runInFrame(tabId, frameId, action) {
   try {
     const [res] = await api.scripting.executeScript({
       target: { tabId, frameIds: [frameId] },
-      func: (a) => window.__floatingPlayer?.[a]() ?? null,
+      func: (a) => window.__yoyoPlayer?.[a]() ?? null,
       args: [action],
     });
     return res?.result ?? null;

@@ -1,6 +1,6 @@
 //
 //  AppDelegate.swift
-//  Floating Player
+//  YoYo Player
 //
 //
 

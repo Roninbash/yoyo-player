@@ -29,7 +29,7 @@ const EMBED_ORIGIN = `http://127.0.0.1:${EMBED_PORT}`;
 
 // Automation can't click the toolbar button, so the test copy gets host access to
 // the fixture server instead of relying on activeTab.
-const extDir = await mkdtemp(path.join(tmpdir(), 'floating-player-'));
+const extDir = await mkdtemp(path.join(tmpdir(), 'yoyo-player-'));
 await cp(path.join(root, 'dist', 'chrome'), extDir, { recursive: true });
 const manifest = JSON.parse(await readFile(path.join(extDir, 'manifest.json'), 'utf8'));
 manifest.host_permissions = [`${ORIGIN}/*`, `${EMBED_ORIGIN}/*`];
@@ -84,7 +84,7 @@ async function open(fixture) {
 function state(page) {
   return page.evaluate(() => {
     const pipDoc = window.documentPictureInPicture?.window?.document;
-    const host = document.querySelector('floating-player');
+    const host = document.querySelector('yoyo-player');
     const v = pipDoc?.querySelector('video')
       ?? host?.shadowRoot.querySelector('video')
       ?? document.querySelector('shadow-player')?.shadowRoot.querySelector('video')
@@ -92,8 +92,8 @@ function state(page) {
     return {
       where: pipDoc?.querySelector('video') ? 'window' : host ? 'page' : 'inline',
       playing: !!v && !v.paused,
-      placeholder: !!document.querySelector('.floating-player-placeholder')
-        || !!document.querySelector('shadow-player')?.shadowRoot.querySelector('.floating-player-placeholder'),
+      placeholder: !!document.querySelector('.yoyo-player-placeholder')
+        || !!document.querySelector('shadow-player')?.shadowRoot.querySelector('.yoyo-player-placeholder'),
       box: host?.getBoundingClientRect().toJSON() ?? null,
       radius: host ? getComputedStyle(host.shadowRoot.querySelector('.frame')).borderRadius : null,
     };
@@ -124,10 +124,10 @@ function iframeState(page) {
   return page.evaluate(() => {
     const f = document.getElementById('embed');
     return {
-      floating: !!document.querySelector('floating-player'),
+      floating: !!document.querySelector('yoyo-player'),
       position: getComputedStyle(f).position,
       box: f.getBoundingClientRect().toJSON(),
-      placeholder: !!document.querySelector('.floating-player-placeholder'),
+      placeholder: !!document.querySelector('.yoyo-player-placeholder'),
     };
   });
 }
@@ -247,7 +247,7 @@ test('embedded videos float in the page without reloading', async () => {
   assert.equal(s.position, 'fixed');
 
   // Drag it by its bar.
-  const bar = await page.evaluate(() => document.querySelector('floating-player').getBoundingClientRect().toJSON());
+  const bar = await page.evaluate(() => document.querySelector('yoyo-player').getBoundingClientRect().toJSON());
   await page.mouse.move(bar.x + 40, bar.y + 12);
   await page.mouse.down();
   await page.mouse.move(200, 100, { steps: 8 });

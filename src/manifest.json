@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Floating Player",
+  "name": "YoYo Player",
   "version": "1.0.0",
   "description": "Pop videos out into a floating player that stays on top of all your apps \u2014 YouTube, Netflix, Prime Video, embeds and more.",
   "minimum_chrome_version": "116",
@@ -11,7 +11,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Floating Player",
+    "default_title": "YoYo Player",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

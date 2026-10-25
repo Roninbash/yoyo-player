@@ -1,6 +1,6 @@
 //
 //  ViewController.swift
-//  Floating Player
+//  YoYo Player
 //
 //
 
@@ -8,7 +8,7 @@ import Cocoa
 import SafariServices
 import WebKit
 
-let extensionBundleIdentifier = "com.example.FloatingPlayer.Extension"
+let extensionBundleIdentifier = "com.example.YoYoPlayer.Extension"
 
 class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHandler {
 

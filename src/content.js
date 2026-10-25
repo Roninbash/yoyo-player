@@ -1,5 +1,5 @@
 (() => {
-  if (window.__floatingPlayer) return;
+  if (window.__yoyoPlayer) return;
 
   const api = globalThis.browser ?? globalThis.chrome;
   const isTop = window === window.top;
@@ -9,7 +9,7 @@
   const SNAP = 24;
   const BAR = 32; // height of the drag bar above a floating embed
   const NS = 'http://www.w3.org/2000/svg';
-  const MSG = '__floatingPlayer'; // marks our postMessages between frames
+  const MSG = '__yoyoPlayer'; // marks our postMessages between frames
   const DEFAULTS = { autoFloat: true, autoPip: true };
 
   // Streaming sites whose players use DRM or break when their video element is moved.
@@ -279,7 +279,7 @@
   function makePlaceholder(target) {
     const r = target.getBoundingClientRect();
     const cs = getComputedStyle(target);
-    const p = el('div', 'floating-player-placeholder', 'Playing in floating player — click to bring it back');
+    const p = el('div', 'yoyo-player-placeholder', 'Playing in YoYo Player — click to bring it back');
     Object.assign(p.style, {
       position: cs.position === 'static' || cs.position === 'fixed' ? 'relative' : cs.position,
       top: cs.top, left: cs.left, margin: cs.margin,
@@ -345,7 +345,7 @@
   // ---------- in-page floating player ----------
 
   function createHost() {
-    host = document.createElement('floating-player');
+    host = document.createElement('yoyo-player');
     setImportant(host, { position: 'fixed', 'z-index': '2147483647', display: 'block', margin: '0', padding: '0' });
     host.attachShadow({ mode: 'open' }).append(styleEl(), ui.frame);
     attachPageHandlers();
@@ -794,7 +794,7 @@
     if (best && !float(best) && best !== v && v) float(v);
   }
 
-  window.__floatingPlayer = {
+  window.__yoyoPlayer = {
     status,
     float() {
       if (mode) restore();

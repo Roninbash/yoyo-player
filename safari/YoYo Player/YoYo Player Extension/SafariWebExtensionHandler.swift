@@ -1,6 +1,6 @@
 //
 //  SafariWebExtensionHandler.swift
-//  Floating Player Extension
+//  YoYo Player Extension
 //
 //
 

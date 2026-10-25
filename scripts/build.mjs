@@ -1,7 +1,7 @@
 // Builds the extension for each browser from src/.
 //
 //   node scripts/build.mjs          -> dist/chrome, dist/safari
-//   node scripts/build.mjs --zip    -> also dist/floating-player-chrome-<version>.zip for the Chrome Web Store
+//   node scripts/build.mjs --zip    -> also dist/yoyo-player-chrome-<version>.zip for the Chrome Web Store
 //
 // src/manifest.json is the Chrome manifest. Safari gets a copy with a background
 // page instead of a service worker and without Chrome-only keys.
@@ -39,7 +39,7 @@ for (const [name, transform] of Object.entries(targets)) {
 }
 
 if (process.argv.includes('--zip')) {
-  const zip = path.join(dist, `floating-player-chrome-${manifest.version}.zip`);
+  const zip = path.join(dist, `yoyo-player-chrome-${manifest.version}.zip`);
   await rm(zip, { force: true });
   execFileSync('zip', ['-r', '-X', '-q', zip, '.'], { cwd: path.join(dist, 'chrome'), stdio: 'inherit' });
   console.log(`packaged ${path.relative(root, zip)}`);
