@@ -4,7 +4,7 @@
 
 A browser extension for Chrome and Safari that pops a website's video out into a floating player. It works with YouTube, Netflix, Prime Video, Disney+, Twitch, embedded players and most other sites. It has two modes:
 
-- **Pop out:** an always-on-top window that floats over every app, even when the browser is in the background.
+- **Pop out:** an always-on-top window that floats over your other apps and follows you between desktops, even when the browser is in the background. On Mac, full-screen apps need the small [YoYo Companion](#full-screen-apps-on-mac-yoyo-companion) app as well.
 - **Float in page:** a mini player inside the tab that you can drag and resize anywhere on the page.
 
 ## Using it
@@ -39,6 +39,24 @@ Copy-protected streaming sites are detected automatically from the video itself.
 | Auto pop-out on tab switch | Yes (Chrome may ask the first time) | Not supported by Safari |
 | Float in page, auto-float on scroll | Yes | Yes |
 
+### Full-screen apps on Mac (YoYo Companion)
+
+macOS gives each full-screen app its own Space, and Chrome's pop-out window can't appear there. It does follow you between regular desktops. Extensions can't change this, so an optional menu-bar app fills the gap: when you swipe to a full-screen app, it shows a live floating copy of the pop-out, and hides the copy when you swipe back.
+
+1. Build it with `npm run companion`, which creates `dist/YoYo Companion.app`. Needs Xcode. You can drag the app to Applications.
+2. Open it and allow **Screen Recording** when asked (System Settings → Privacy & Security → Screen & System Audio Recording), then quit it from its menu-bar icon and open it again. It reads only the browser's pop-out window, and nothing is saved or sent.
+3. Pop out a video in the browser, then swipe to a full-screen app.
+
+Drag the copy to move it, drag its edges to resize it, or hover and click ✕ to hide it until the next pop-out. To start it automatically, add it under System Settings → General → Login Items.
+
+Good to know:
+
+- The copy is picture only. Sound keeps coming from the browser, and the playback controls are on the real pop-out, so swipe back to use them.
+- It works with Chrome and other Chromium browsers. Safari wasn't tested and isn't watched.
+- Copy-protected video (Netflix, Prime Video and similar) wasn't tested and may show black.
+- It needs macOS 13 or newer. It relies on one deprecated Apple call to capture the window and one non-public call to spot closed windows, so a future macOS update could stop it working. If that happens the copy stops appearing, and the pop-out itself isn't affected. These calls also rule out the Mac App Store.
+- Each rebuild needs Screen Recording allowed again, because macOS treats it as a new app. It's signed to run only on the Mac that built it, so other people should build their own copy.
+
 ## Development
 
 Requirements: Node 18+. For Safari, also Xcode 15+.
@@ -48,6 +66,7 @@ src/            extension source (src/manifest.json is the Chrome manifest)
 scripts/        build script and icon generator
 tests/          end-to-end tests and fixture pages
 safari/         Xcode project that wraps the extension as a Mac app
+companion/      YoYo Companion, the optional Mac app for full-screen apps
 assets/         full-size logo
 dist/           build output (generated)
 ```
@@ -60,6 +79,7 @@ The icons are drawn by `scripts/make-icons.py`. To change the logo, edit it and 
 | `npm run package` | Also zips `dist/chrome` for the Chrome Web Store |
 | `npm test` | Builds, then runs the end-to-end tests in Chromium |
 | `npm run safari` | Builds, then builds the Safari app with Xcode |
+| `npm run companion` | Builds `dist/YoYo Companion.app` |
 
 Run `npm install` once first. For tests, also run `npx playwright install chromium` once.
 
