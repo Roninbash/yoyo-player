@@ -1,6 +1,9 @@
 #!/bin/sh
 # Builds dist/YoYo Companion.app (Apple silicon and Intel), signed to run on this Mac,
 # and registers it so the extension's popup can turn it on and off.
+#
+# macOS ties the Screen Recording permission to this exact build, even when it's signed
+# with a developer certificate, so every rebuild has to be allowed again.
 set -e
 cd "$(dirname "$0")/.."
 app="dist/YoYo Companion.app"
@@ -33,10 +36,7 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$set_dir" -o "$app/Contents/Resources/AppIcon.icns"
 
-# With an Apple Development certificate, macOS keeps the Screen Recording permission
-# across rebuilds. Without one, sign just for this build, and each rebuild has to ask again.
-identity="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Apple Development/ {print $2}' | sort | head -1)"
-codesign --force --sign "${identity:--}" "$app"
+codesign --force --sign - "$app"
 "$app/Contents/MacOS/YoYo Companion" --register
 [ -n "$was_running" ] && open -g "$app"
 echo "built $app"

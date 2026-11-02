@@ -57,7 +57,7 @@ Good to know:
 - It works with Chrome and other Chromium browsers. Safari wasn't tested and isn't watched.
 - Copy-protected video (Netflix, Prime Video and similar) wasn't tested and may show black.
 - It needs macOS 13 or newer. It relies on one deprecated Apple call to capture the window and one non-public call to spot closed windows, so a future macOS update could stop it working. If that happens the copy stops appearing, and the pop-out itself isn't affected. These calls also rule out the Mac App Store.
-- If your Mac has an Apple Development certificate, the build uses it and macOS keeps the Screen Recording permission across rebuilds. Without one, each rebuild needs it allowed again. Either way the build is meant for the Mac that made it, so other people should build their own copy.
+- Each rebuild needs Screen Recording allowed again, because macOS ties the permission to that exact build. The build is also meant for the Mac that made it, so other people should build their own copy.
 
 ## Development
 
