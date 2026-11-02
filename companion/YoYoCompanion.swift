@@ -366,12 +366,24 @@ private func wait(upTo seconds: TimeInterval, until done: () -> Bool) {
   while !done(), Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
 }
 
+// Standard output carries the messages to the browser, so helpers must stay off it.
+private func runQuietly(_ path: String, _ arguments: [String]) {
+  let process = Process()
+  process.executableURL = URL(fileURLWithPath: path)
+  process.arguments = arguments
+  process.standardOutput = FileHandle.nullDevice
+  process.standardError = FileHandle.nullDevice
+  try? process.run()
+  process.waitUntilExit()
+}
+
 private func runOpen(_ arguments: [String]) {
-  let open = Process()
-  open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-  open.arguments = arguments
-  try? open.run()
-  open.waitUntilExit()
+  runQuietly("/usr/bin/open", arguments)
+}
+
+private func resetPermissions() {
+  guard let id = Bundle.main.bundleIdentifier else { return }
+  runQuietly("/usr/bin/tccutil", ["reset", "All", id])
 }
 
 private func startCompanion() {
@@ -442,11 +454,20 @@ private func runNativeHost() {
   case "stop": stopCompanion()
   case "allow":
     // macOS only applies a new Screen Recording permission after a restart, so restart
-    // first in case it was already granted, and only then show the settings if it's needed.
+    // first in case it was already granted.
     stopCompanion()
     startCompanion()
+    wait(upTo: 1.5) { false } // past the app's next permission check
     UserDefaults.standard.synchronize()
-    if !UserDefaults.standard.bool(forKey: allowedKey) { runOpen([permissionSettingsURL]) }
+    if !UserDefaults.standard.bool(forKey: allowedKey) {
+      // Still not allowed. macOS may be holding an entry from a differently signed build,
+      // which can look switched on in Settings but no longer matches this app. Nothing is
+      // lost by clearing it, since it isn't working, and macOS then makes a fresh entry.
+      stopCompanion()
+      resetPermissions()
+      startCompanion()
+      runOpen([permissionSettingsURL])
+    }
   default: break
   }
 

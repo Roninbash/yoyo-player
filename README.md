@@ -44,7 +44,7 @@ Copy-protected streaming sites are detected automatically from the video itself.
 macOS gives each full-screen app its own Space, and Chrome's pop-out window can't appear there. It does follow you between regular desktops. Extensions can't change this, so an optional menu-bar app fills the gap: when you swipe to a full-screen app, it shows a live floating copy of the pop-out, and hides the copy when you swipe back.
 
 1. Build it once with `npm run companion`, which creates `dist/YoYo Companion.app` and connects it to your browsers. Needs Xcode. If you move the app, for example to Applications, open it once from its new place.
-2. In the extension's popup, turn on **Show over full-screen apps**. If the popup says **Allow**, click it and turn on YoYo Companion under Screen & System Audio Recording. macOS requires you to flip that switch yourself; an extension can't do it for you. Then choose **Quit & Reopen** if macOS offers it, or click **Allow** in the popup again.
+2. In the extension's popup, turn on **Show over full-screen apps**. If the popup says **Allow**, click it and turn on YoYo Companion under Screen & System Audio Recording. macOS requires you to flip that switch yourself; an extension can't do it for you. Then choose **Quit & Reopen** if macOS offers it, or click **Allow** in the popup again. If it's already on but the popup keeps asking, **Allow** clears the outdated entry, so turn the new one on.
 3. Pop out a video in the browser, then swipe to a full-screen app.
 
 The app reads only the browser's pop-out window, and nothing is saved or sent. The same switch turns it off.
