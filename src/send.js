@@ -73,11 +73,13 @@ async function runAction(tabId, action, states) {
   return runInFrame(tabId, frameId, action);
 }
 
+const COMPANION_HOST = 'yoyo.player.companion';
+
 // Talks to the YoYo Companion Mac app (status / start / stop / allow). Returns
 // { running, allowed }, or null if the app isn't installed.
 async function companionMessage(action) {
   try {
-    return await api.runtime.sendNativeMessage('yoyo.player.companion', { action });
+    return await api.runtime.sendNativeMessage(COMPANION_HOST, { action });
   } catch {
     return null;
   }

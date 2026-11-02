@@ -97,6 +97,8 @@
   let autoFloated = false; // floated by scrolling; scrolling back restores it
   let autoPopped = false;  // popped out by switching tabs; coming back restores it
   const pos = { x: 0, y: 0 };
+  let companionLink = null; // port to the background worker while a video is popped out
+  let sentPaused = null;
   const seen = new WeakSet();      // videos/embeds the user has actually watched on the page
   const dismissed = new WeakSet(); // closed manually; don't auto-float until scrolled back into view
 
@@ -335,11 +337,16 @@
     if (manual && target.isConnected && visibleRatio(target) < 0.6) dismissed.add(target);
     mode = kind = pipWin = null;
     autoFloated = autoPopped = false;
+    updateCompanion();
+  }
+
+  function toggleVideo(v) {
+    if (v.paused || v.ended) v.play().catch(() => {});
+    else v.pause();
   }
 
   function togglePlay() {
-    if (video.paused || video.ended) video.play().catch(() => {});
-    else video.pause();
+    toggleVideo(video);
   }
 
   // ---------- in-page floating player ----------
@@ -558,6 +565,7 @@
     try {
       await enterVideoPip(v);
       autoPopped = auto;
+      updateCompanion();
     } catch {
       if (!auto) float(v);
     }
@@ -703,6 +711,59 @@
     ui.time.textContent = live ? 'LIVE' : `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
     ui.fill.style.width = `${frac * 100}%`;
     ui.title.textContent = document.title;
+    if (mode === 'window') updateCompanion();
+  }
+
+  // ---------- play/pause from the Mac companion app ----------
+  //
+  // The companion's floating copy is only a picture, so its clicks have to reach the real
+  // video. While a video is popped out, this frame keeps a port open to the background
+  // worker, which relays commands and play/pause state to and from the app.
+
+  const companionSupported = api.runtime.getManifest().permissions?.includes('nativeMessaging');
+
+  function poppedOutVideo() {
+    if (mode === 'window') return video;
+    const el = videoInPip();
+    if (!el) return null;
+    // For a video inside a shadow root, the document only reports the root's host.
+    return el.localName === 'video' ? el : scan().videos.find((v) => v.matches(':picture-in-picture')) ?? null;
+  }
+
+  function closeCompanionLink() {
+    try {
+      companionLink?.disconnect();
+    } catch {
+      // The extension was reloaded; the port is already gone.
+    }
+    companionLink = null;
+    sentPaused = null;
+  }
+
+  function updateCompanion() {
+    if (!companionSupported) return;
+    const v = poppedOutVideo();
+    if (!v) return closeCompanionLink();
+    try {
+      if (!companionLink) {
+        companionLink = api.runtime.connect({ name: 'companion' });
+        companionLink.onMessage.addListener(({ command }) => {
+          const target = poppedOutVideo();
+          if (command === 'togglePlay' && target) toggleVideo(target);
+        });
+        companionLink.onDisconnect.addListener(() => {
+          companionLink = null;
+          sentPaused = null;
+        });
+      }
+      const paused = v.paused || v.ended;
+      if (paused !== sentPaused) {
+        companionLink.postMessage({ paused });
+        sentPaused = paused;
+      }
+    } catch {
+      closeCompanionLink();
+    }
   }
 
   // ---------- automatic triggers (top frame) ----------
@@ -763,7 +824,11 @@
   // Media events don't bubble, so listen in the capture phase.
   for (const type of ['play', 'pause', 'ended', 'volumechange', 'loadedmetadata', 'emptied',
     'enterpictureinpicture', 'leavepictureinpicture']) {
-    document.addEventListener(type, () => (isTop ? onScroll() : scheduleReport()), { capture: true });
+    document.addEventListener(type, () => {
+      if (companionLink || type === 'enterpictureinpicture') updateCompanion();
+      if (isTop) onScroll();
+      else scheduleReport();
+    }, { capture: true });
   }
   scheduleReport();
 

@@ -7,6 +7,14 @@ app="dist/YoYo Companion.app"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Replace a running copy, and start the new one afterwards.
+was_running=""
+if pgrep -x "YoYo Companion" >/dev/null; then
+  was_running=1
+  pkill -x "YoYo Companion"
+  sleep 1
+fi
+
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp companion/Info.plist "$app/Contents/Info.plist"
@@ -25,6 +33,10 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$set_dir" -o "$app/Contents/Resources/AppIcon.icns"
 
-codesign --force --sign - "$app"
+# With an Apple Development certificate, macOS keeps the Screen Recording permission
+# across rebuilds. Without one, sign just for this build, and each rebuild has to ask again.
+identity="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Apple Development/ {print $2}' | sort | head -1)"
+codesign --force --sign "${identity:--}" "$app"
 "$app/Contents/MacOS/YoYo Companion" --register
+[ -n "$was_running" ] && open -g "$app"
 echo "built $app"

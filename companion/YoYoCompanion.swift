@@ -5,11 +5,13 @@
 // panel can appear there, though. So when the pop-out goes off screen, this app shows a
 // live copy of it in such a panel, and hides the copy again once the pop-out is back.
 //
-// The copy is picture only: sound keeps coming from the browser.
+// The copy is only a picture, and sound keeps coming from the browser. Clicking it plays
+// or pauses the real video, through the extension.
 //
 // The same binary is also the extension's native messaging host. The browser starts it
-// with the extension's origin as an argument, and then it only answers one message
-// (status, or start/stop/allow the app) and exits. That's what the popup's switch talks to.
+// with the extension's origin as an argument, and it then answers one message (status, or
+// start/stop/allow the app, for the popup's switch) and exits, or stays to relay play/pause
+// between the extension and the running app while a video is popped out.
 
 import AppKit
 
@@ -30,6 +32,8 @@ private let browserDataDirs = [
   "Google/Chrome", "Google/Chrome Beta", "Google/Chrome Dev", "Google/Chrome Canary", "Google/Chrome for Testing",
   "Chromium", "Microsoft Edge", "BraveSoftware/Brave-Browser", "Arc/User Data", "Vivaldi", "com.operasoftware.Opera",
 ]
+private let stateNotification = Notification.Name("yoyo.player.companion.state")
+private let commandNotification = Notification.Name("yoyo.player.companion.command")
 private let permissionSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
 // Streaming capture stalls after about two seconds for an off-screen window, while this
@@ -90,9 +94,15 @@ private final class FirstClickButton: NSButton {
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-// Drags move the panel; a hover reveals the close button.
+// A click plays or pauses, a drag moves the panel, and a hover reveals the buttons.
 private final class MirrorView: NSView {
   let closeButton = FirstClickButton()
+  let playButton = FirstClickButton()
+  var onClick: (() -> Void)?
+  private var grabPoint: NSPoint?
+  private var didDrag = false
+  private var hovering = false
+  private var paused: Bool? // nil until the extension reports a video it can control
 
   override init(frame: NSRect) {
     super.init(frame: frame)
@@ -111,14 +121,58 @@ private final class MirrorView: NSView {
     closeButton.frame = NSRect(x: frame.width - 26, y: frame.height - 26, width: 20, height: 20)
     closeButton.autoresizingMask = [.minXMargin, .minYMargin]
     addSubview(closeButton)
+
+    playButton.isBordered = false
+    playButton.contentTintColor = .white
+    playButton.isHidden = true
+    playButton.wantsLayer = true
+    playButton.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.55).cgColor
+    playButton.layer?.cornerRadius = 18
+    playButton.frame = NSRect(x: (frame.width - 36) / 2, y: 12, width: 36, height: 36)
+    playButton.autoresizingMask = [.minXMargin, .maxXMargin, .maxYMargin]
+    addSubview(playButton)
+
     addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
   }
   required init?(coder: NSCoder) { fatalError("not used") }
 
-  override var mouseDownCanMoveWindow: Bool { true }
+  func setPlayback(paused: Bool?) {
+    self.paused = paused
+    updateButtons()
+  }
+
+  private func updateButtons() {
+    closeButton.isHidden = !hovering
+    playButton.isHidden = paused == nil || !(hovering || paused == true)
+    guard let paused else { return }
+    let label = paused ? "Play" : "Pause"
+    playButton.image = NSImage(systemSymbolName: paused ? "play.fill" : "pause.fill", accessibilityDescription: label)
+    playButton.toolTip = label
+  }
+
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-  override func mouseEntered(with event: NSEvent) { closeButton.isHidden = false }
-  override func mouseExited(with event: NSEvent) { closeButton.isHidden = true }
+  override func mouseEntered(with event: NSEvent) { hovering = true; updateButtons() }
+  override func mouseExited(with event: NSEvent) { hovering = false; updateButtons() }
+
+  override func mouseDown(with event: NSEvent) {
+    grabPoint = event.locationInWindow
+    didDrag = false
+  }
+
+  override func mouseDragged(with event: NSEvent) {
+    guard let window, let grabPoint else { return }
+    // The true pointer position, because event locations are relative to the moving window.
+    let pointer = NSEvent.mouseLocation
+    let origin = NSPoint(x: pointer.x - grabPoint.x, y: pointer.y - grabPoint.y)
+    if !didDrag, hypot(origin.x - window.frame.minX, origin.y - window.frame.minY) < 4 { return }
+    didDrag = true
+    window.setFrameOrigin(origin)
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    if grabPoint != nil, !didDrag { onClick?() }
+    grabPoint = nil
+  }
 }
 
 private final class MirrorPanel: NSPanel {
@@ -129,7 +183,6 @@ private final class MirrorPanel: NSPanel {
     // The non-activating style is what lets it appear on another app's full-screen Space.
     collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     hidesOnDeactivate = false
-    isMovableByWindowBackground = true
     isOpaque = false
     backgroundColor = .clear
     hasShadow = true
@@ -152,15 +205,19 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
   private var mirroredID: CGWindowID?
   private var dismissedID: CGWindowID?
   private var frameInFlight = false
+  private var hasPermission = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    let allowedAtLaunch = CGPreflightScreenCaptureAccess()
-    publishPermission(allowedAtLaunch)
-    if !allowedAtLaunch { CGRequestScreenCaptureAccess() }
+    hasPermission = CGPreflightScreenCaptureAccess()
+    publishPermission(hasPermission)
+    if !hasPermission { CGRequestScreenCaptureAccess() }
 
     view.autoresizingMask = [.width, .height]
     view.closeButton.target = self
     view.closeButton.action = #selector(dismissMirror)
+    view.playButton.target = self
+    view.playButton.action = #selector(togglePlayback)
+    view.onClick = { [weak self] in self?.togglePlayback() }
     panel.contentView = view
     panel.delegate = self
 
@@ -174,6 +231,8 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
     menu.addItem(NSMenuItem(title: "Quit YoYo Companion", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     statusItem.menu = menu
 
+    DistributedNotificationCenter.default().addObserver(
+      self, selector: #selector(playbackChanged(_:)), name: stateNotification, object: nil, suspensionBehavior: .deliverImmediately)
     NSWorkspace.shared.notificationCenter.addObserver(
       self, selector: #selector(refresh), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
     Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(refresh), userInfo: nil, repeats: true)
@@ -181,8 +240,11 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
   }
 
   @objc private func refresh() {
-    let allowed = CGPreflightScreenCaptureAccess()
-    publishPermission(allowed)
+    // Once granted, it holds for this run. macOS only applies changes after a restart, and
+    // this check can briefly report false, which would make the copy flicker.
+    hasPermission = hasPermission || CGPreflightScreenCaptureAccess()
+    publishPermission(hasPermission)
+    let allowed = hasPermission
     permissionItem.isHidden = allowed
     let popOut = findPopOut()
     if dismissedID != popOut?.id { dismissedID = nil } // that pop-out closed; forget the dismissal
@@ -215,6 +277,7 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
     panel.contentAspectRatio = popOut.frame.size
     panel.orderFrontRegardless()
     startGrabbing(popOut.id)
+    postCommand("requestState")
   }
 
   private func hide() {
@@ -245,6 +308,16 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
   private func stopGrabbing() {
     grabTimer?.cancel()
     grabTimer = nil
+  }
+
+  private func postCommand(_ command: String) {
+    DistributedNotificationCenter.default().postNotificationName(commandNotification, object: command, userInfo: nil, deliverImmediately: true)
+  }
+
+  @objc private func togglePlayback() { postCommand("togglePlay") }
+
+  @objc private func playbackChanged(_ notification: Notification) {
+    view.setPlayback(paused: notification.userInfo?["paused"] as? Bool)
   }
 
   @objc private func dismissMirror() {
@@ -312,15 +385,59 @@ private func stopCompanion() {
   wait(upTo: 3) { runningCompanions().isEmpty }
 }
 
-// One message in, one message out: each is a 32-bit length followed by JSON.
-private func runNativeHost() {
-  let input = FileHandle.standardInput.readData(ofLength: 4)
-  guard input.count == 4 else { return }
-  let length = input.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+// Messages to and from the browser are a 32-bit length followed by JSON.
+private func readMessage() -> [String: Any]? {
+  let header = FileHandle.standardInput.readData(ofLength: 4)
+  guard header.count == 4 else { return nil }
+  let length = header.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
   let body = FileHandle.standardInput.readData(ofLength: Int(length))
-  let action = (try? JSONSerialization.jsonObject(with: body) as? [String: Any])?["action"] as? String
+  return (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+}
 
-  switch action {
+private func writeMessage(_ message: [String: Any]) {
+  guard let data = try? JSONSerialization.data(withJSONObject: message) else { return }
+  var size = UInt32(data.count)
+  FileHandle.standardOutput.write(Data(bytes: &size, count: 4))
+  FileHandle.standardOutput.write(data)
+}
+
+// Passes play/pause between the extension and the running app until the browser hangs up.
+private func runRelay() -> Never {
+  let center = DistributedNotificationCenter.default()
+  var paused: Bool?
+  func announce() {
+    let info: [AnyHashable: Any]? = paused.map { ["paused": $0] }
+    center.postNotificationName(stateNotification, object: nil, userInfo: info, deliverImmediately: true)
+  }
+  let observer = center.addObserver(forName: commandNotification, object: nil, queue: .main) { note in
+    switch note.object as? String {
+    case "togglePlay": writeMessage(["command": "togglePlay"])
+    case "requestState": announce()
+    default: break
+    }
+  }
+  DispatchQueue.global().async {
+    while let message = readMessage() {
+      guard let value = message["paused"] as? Bool else { continue }
+      DispatchQueue.main.async {
+        paused = value
+        announce()
+      }
+    }
+    DispatchQueue.main.async {
+      paused = nil
+      announce()
+      center.removeObserver(observer)
+      exit(0)
+    }
+  }
+  RunLoop.main.run()
+  exit(0)
+}
+
+private func runNativeHost() {
+  switch readMessage()?["action"] as? String {
+  case "relay": runRelay()
   case "start": startCompanion()
   case "stop": stopCompanion()
   case "allow":
@@ -334,14 +451,10 @@ private func runNativeHost() {
   }
 
   UserDefaults.standard.synchronize()
-  let reply = try? JSONSerialization.data(withJSONObject: [
+  writeMessage([
     "running": !runningCompanions().isEmpty,
     "allowed": UserDefaults.standard.bool(forKey: allowedKey),
   ])
-  guard let reply else { return }
-  var size = UInt32(reply.count)
-  FileHandle.standardOutput.write(Data(bytes: &size, count: 4))
-  FileHandle.standardOutput.write(reply)
 }
 
 if CommandLine.arguments.contains(where: { $0.hasPrefix("chrome-extension://") }) {
