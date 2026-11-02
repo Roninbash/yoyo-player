@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "YoYo Player",
   "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqbTuWjLy4xRaf1EybsCmkvqjH/7BrwTd9hanwCCDbEsoNEHoG2ZPY66FJH0NP9e+oOeZC4yMOgtwmMQkrJsKLhBXwCwB2iMSl5/vkQjT1vjmvbPu9etdsdDN+uujaWb6n5mUXGrKX95VRmgywwNjCzXHZGl2Qu9ruEj6uBgeRnCeVQPf4gMH+xqM1++viD2HvjLbWhkp5U61iJP7j59LFUrLEKWRrv0XDhkjuFP40BOm2uc+b2CChiJPgm3WLq3qriAWHrx0ncW4wF4/5x2Mkvk/W2lZ8sh3ePmRbvc35uvCup3hPkDT4d+/NADtb76jgsEZlPMeYL/tqElzbMT+bQIDAQAB",
   "description": "Pop videos out into a floating player that stays on top of all your apps \u2014 YouTube, Netflix, Prime Video, embeds and more.",
   "minimum_chrome_version": "116",
   "icons": {
@@ -24,7 +25,8 @@
   "permissions": [
     "storage",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "nativeMessaging"
   ],
   "content_scripts": [
     {

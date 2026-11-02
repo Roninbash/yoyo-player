@@ -6,6 +6,10 @@
 // live copy of it in such a panel, and hides the copy again once the pop-out is back.
 //
 // The copy is picture only: sound keeps coming from the browser.
+//
+// The same binary is also the extension's native messaging host. The browser starts it
+// with the extension's origin as an argument, and then it only answers one message
+// (status, or start/stop/allow the app) and exits. That's what the popup's switch talks to.
 
 import AppKit
 
@@ -17,6 +21,16 @@ private let browsers: Set<String> = [
 private let minPopOutSize = CGSize(width: 150, height: 80)
 private let framesPerSecond = 30.0
 private let positionKey = "mirrorFrame"
+private let allowedKey = "screenRecordingAllowed"
+
+private let hostName = "yoyo.player.companion"
+private let allowedOrigins = ["chrome-extension://fjhgppdcojomjenaikcfnplkgljndaif/"]
+// Where each Chromium browser looks for native messaging hosts, under Application Support.
+private let browserDataDirs = [
+  "Google/Chrome", "Google/Chrome Beta", "Google/Chrome Dev", "Google/Chrome Canary", "Google/Chrome for Testing",
+  "Chromium", "Microsoft Edge", "BraveSoftware/Brave-Browser", "Arc/User Data", "Vivaldi", "com.operasoftware.Opera",
+]
+private let permissionSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
 // Streaming capture stalls after about two seconds for an off-screen window, while this
 // call keeps returning fresh frames. Apple has deprecated it and removed it from the
@@ -140,7 +154,9 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
   private var frameInFlight = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    if !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
+    let allowedAtLaunch = CGPreflightScreenCaptureAccess()
+    publishPermission(allowedAtLaunch)
+    if !allowedAtLaunch { CGRequestScreenCaptureAccess() }
 
     view.autoresizingMask = [.width, .height]
     view.closeButton.target = self
@@ -166,6 +182,7 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
 
   @objc private func refresh() {
     let allowed = CGPreflightScreenCaptureAccess()
+    publishPermission(allowed)
     permissionItem.isHidden = allowed
     let popOut = findPopOut()
     if dismissedID != popOut?.id { dismissedID = nil } // that pop-out closed; forget the dismissal
@@ -179,6 +196,14 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
         : windowImage == nil ? "This version of macOS isn't supported"
         : popOut == nil ? "Waiting for a pop-out window"
         : "Ready: pop-out is on screen"
+    }
+  }
+
+  // The extension's popup reads this through the native messaging host.
+  private func publishPermission(_ allowed: Bool) {
+    if UserDefaults.standard.object(forKey: allowedKey) as? Bool != allowed {
+      UserDefaults.standard.set(allowed, forKey: allowedKey)
+      UserDefaults.standard.synchronize()
     }
   }
 
@@ -229,9 +254,7 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
   }
 
   @objc private func openPermissionSettings() {
-    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
-      NSWorkspace.shared.open(url)
-    }
+    if let url = URL(string: permissionSettingsURL) { NSWorkspace.shared.open(url) }
   }
 
   private func savePosition() {
@@ -240,6 +263,93 @@ private final class Companion: NSObject, NSApplicationDelegate, NSWindowDelegate
   func windowDidMove(_ notification: Notification) { savePosition() }
   func windowDidEndLiveResize(_ notification: Notification) { savePosition() }
 }
+
+// ---------- native messaging host ----------
+
+// Tells the browsers where to find this binary. Runs at every launch, so moving the app just works.
+private func registerNativeHost() {
+  guard let executable = Bundle.main.executablePath,
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first,
+        let manifest = try? JSONSerialization.data(withJSONObject: [
+          "name": hostName, "description": "YoYo Companion", "path": executable,
+          "type": "stdio", "allowed_origins": allowedOrigins,
+        ], options: [.prettyPrinted]) else { return }
+  for dir in browserDataDirs {
+    let browser = support.appendingPathComponent(dir)
+    guard FileManager.default.fileExists(atPath: browser.path) else { continue }
+    let hosts = browser.appendingPathComponent("NativeMessagingHosts")
+    try? FileManager.default.createDirectory(at: hosts, withIntermediateDirectories: true)
+    try? manifest.write(to: hosts.appendingPathComponent("\(hostName).json"), options: .atomic)
+  }
+}
+
+private func runningCompanions() -> [NSRunningApplication] {
+  guard let id = Bundle.main.bundleIdentifier else { return [] }
+  return NSRunningApplication.runningApplications(withBundleIdentifier: id).filter { $0.processIdentifier != getpid() }
+}
+
+private func wait(upTo seconds: TimeInterval, until done: () -> Bool) {
+  let deadline = Date().addingTimeInterval(seconds)
+  while !done(), Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+}
+
+private func runOpen(_ arguments: [String]) {
+  let open = Process()
+  open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+  open.arguments = arguments
+  try? open.run()
+  open.waitUntilExit()
+}
+
+private func startCompanion() {
+  runOpen(["-g", Bundle.main.bundlePath])
+  wait(upTo: 3) { !runningCompanions().isEmpty }
+  wait(upTo: 0.8) { false } // give it a moment to publish its permission state
+}
+
+private func stopCompanion() {
+  runningCompanions().forEach { $0.terminate() }
+  wait(upTo: 3) { runningCompanions().isEmpty }
+}
+
+// One message in, one message out: each is a 32-bit length followed by JSON.
+private func runNativeHost() {
+  let input = FileHandle.standardInput.readData(ofLength: 4)
+  guard input.count == 4 else { return }
+  let length = input.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+  let body = FileHandle.standardInput.readData(ofLength: Int(length))
+  let action = (try? JSONSerialization.jsonObject(with: body) as? [String: Any])?["action"] as? String
+
+  switch action {
+  case "start": startCompanion()
+  case "stop": stopCompanion()
+  case "allow":
+    // macOS only applies a new Screen Recording permission after a restart, so restart
+    // first in case it was already granted, and only then show the settings if it's needed.
+    stopCompanion()
+    startCompanion()
+    UserDefaults.standard.synchronize()
+    if !UserDefaults.standard.bool(forKey: allowedKey) { runOpen([permissionSettingsURL]) }
+  default: break
+  }
+
+  UserDefaults.standard.synchronize()
+  let reply = try? JSONSerialization.data(withJSONObject: [
+    "running": !runningCompanions().isEmpty,
+    "allowed": UserDefaults.standard.bool(forKey: allowedKey),
+  ])
+  guard let reply else { return }
+  var size = UInt32(reply.count)
+  FileHandle.standardOutput.write(Data(bytes: &size, count: 4))
+  FileHandle.standardOutput.write(reply)
+}
+
+if CommandLine.arguments.contains(where: { $0.hasPrefix("chrome-extension://") }) {
+  runNativeHost()
+  exit(0)
+}
+registerNativeHost()
+if CommandLine.arguments.contains("--register") { exit(0) }
 
 private let app = NSApplication.shared
 private let delegate = Companion()

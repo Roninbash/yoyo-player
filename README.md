@@ -43,9 +43,11 @@ Copy-protected streaming sites are detected automatically from the video itself.
 
 macOS gives each full-screen app its own Space, and Chrome's pop-out window can't appear there. It does follow you between regular desktops. Extensions can't change this, so an optional menu-bar app fills the gap: when you swipe to a full-screen app, it shows a live floating copy of the pop-out, and hides the copy when you swipe back.
 
-1. Build it with `npm run companion`, which creates `dist/YoYo Companion.app`. Needs Xcode. You can drag the app to Applications.
-2. Open it and allow **Screen Recording** when asked (System Settings → Privacy & Security → Screen & System Audio Recording), then quit it from its menu-bar icon and open it again. It reads only the browser's pop-out window, and nothing is saved or sent.
+1. Build it once with `npm run companion`, which creates `dist/YoYo Companion.app` and connects it to your browsers. Needs Xcode. If you move the app, for example to Applications, open it once from its new place.
+2. In the extension's popup, turn on **Show over full-screen apps**. If the popup says **Allow**, click it and turn on YoYo Companion under Screen & System Audio Recording. macOS requires you to flip that switch yourself; an extension can't do it for you. Then choose **Quit & Reopen** if macOS offers it, or click **Allow** in the popup again.
 3. Pop out a video in the browser, then swipe to a full-screen app.
+
+The app reads only the browser's pop-out window, and nothing is saved or sent. The same switch turns it off.
 
 Drag the copy to move it, drag its edges to resize it, or hover and click ✕ to hide it until the next pop-out. To start it automatically, add it under System Settings → General → Login Items.
 
@@ -112,7 +114,9 @@ The Xcode project reads its files from `dist/safari`. If you add a new file to `
    - **Access to all sites** (content script): finds the video on the page and runs the floating player and the scroll and tab-switch triggers.
    - **scripting / activeTab:** runs the pop-out and float actions in the current tab from the toolbar button or shortcut.
    - **storage:** saves the user's settings and the player's position and size.
+   - **nativeMessaging:** lets the popup's switch start and stop the optional YoYo Companion Mac app and show its status.
 4. Privacy: the extension collects no data. See [PRIVACY.md](PRIVACY.md).
+5. The store assigns its own extension ID, and `npm run package` leaves out the manifest's `key` because the store rejects it. After the first upload, add the store ID to `allowedOrigins` in `companion/YoYoCompanion.swift`, or the popup's switch won't reach the app.
 
 ### Mac App Store (Safari)
 

@@ -62,6 +62,35 @@ if (isSafari) {
   document.getElementById('shortcuts').hidden = true;
 }
 
+// Mac only: the companion app shows the pop-out over full-screen apps. Safari doesn't need it.
+const companionBox = document.getElementById('companion');
+const companionNote = document.getElementById('companion-note');
+
+function renderCompanion(state) {
+  const needsPermission = !!state?.running && !state.allowed;
+  companionBox.disabled = !state;
+  companionBox.checked = !!state?.running;
+  document.getElementById('companion-text').textContent =
+    !state ? 'Needs the YoYo Companion app.' : needsPermission ? 'Needs Screen Recording permission.' : '';
+  document.getElementById('companion-allow').hidden = !needsPermission;
+  document.getElementById('companion-get').hidden = !!state;
+  companionNote.hidden = !!state && !needsPermission;
+}
+
+if (!isSafari) {
+  api.runtime.getPlatformInfo().then(async ({ os }) => {
+    if (os !== 'mac') return;
+    document.getElementById('companion-row').hidden = false;
+    renderCompanion(await companionMessage('status'));
+  });
+}
+companionBox.addEventListener('change', async () => {
+  renderCompanion(await companionMessage(companionBox.checked ? 'start' : 'stop'));
+});
+document.getElementById('companion-allow').addEventListener('click', async () => {
+  renderCompanion(await companionMessage('allow'));
+});
+
 api.commands.getAll().then((commands) => {
   for (const c of commands) {
     const kbd = document.getElementById(`key-${c.name}`);

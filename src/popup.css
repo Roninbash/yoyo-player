@@ -65,4 +65,17 @@ kbd {
 }
 a { color: var(--muted); }
 
+.companion { border-top: 1px solid var(--line); }
+.companion-note { margin: -4px 0 8px 21px; color: var(--muted); font-size: 12px; }
+button.link {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 [hidden] { display: none !important; }

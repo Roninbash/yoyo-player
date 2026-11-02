@@ -24,7 +24,17 @@
       <input type="checkbox" id="autoFloat">
       <span>Float in page when I scroll past a playing video</span>
     </label>
-  </div>
+    <div class="companion" id="companion-row" hidden>
+      <label class="option">
+        <input type="checkbox" id="companion" disabled>
+        <span>Show over full-screen apps</span>
+      </label>
+      <p class="companion-note" id="companion-note" hidden>
+        <span id="companion-text"></span>
+        <button class="link" id="companion-allow" type="button" hidden>Allow</button>
+        <a id="companion-get" href="https://github.com/Roninbash/yoyo-player#full-screen-apps-on-mac-yoyo-companion" target="_blank" rel="noopener" hidden>Get the Mac app</a>
+      </p>
+    </div>
 
   <p class="hint" id="shortcut-hint">
     Pop out: <kbd id="key-pop-out">not set</kbd><br>

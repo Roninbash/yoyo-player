@@ -312,6 +312,16 @@ test('DRM videos (Netflix, Prime Video, ...) are never moved; pop-out uses pictu
   await page.close();
 });
 
+test('on a Mac, the popup offers the companion app and says when it is missing', async () => {
+  if (process.platform !== 'darwin') return;
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extId}/popup.html`);
+  await page.waitForSelector('#companion-get', { state: 'visible' });
+  assert.ok(await page.isDisabled('#companion'), 'the switch is off until the app is installed');
+  assert.match(await page.textContent('#companion-text'), /Needs the YoYo Companion app/);
+  await page.close();
+});
+
 test('the popup loads without errors', async () => {
   const page = await context.newPage();
   const errors = [];

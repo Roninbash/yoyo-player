@@ -72,3 +72,13 @@ async function runAction(tabId, action, states) {
   const frameId = action === 'float' ? 0 : popOutFrame(states);
   return runInFrame(tabId, frameId, action);
 }
+
+// Talks to the YoYo Companion Mac app (status / start / stop / allow). Returns
+// { running, allowed }, or null if the app isn't installed.
+async function companionMessage(action) {
+  try {
+    return await api.runtime.sendNativeMessage('yoyo.player.companion', { action });
+  } catch {
+    return null;
+  }
+}

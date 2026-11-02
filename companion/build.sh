@@ -1,5 +1,6 @@
 #!/bin/sh
-# Builds dist/YoYo Companion.app (Apple silicon and Intel), signed to run on this Mac.
+# Builds dist/YoYo Companion.app (Apple silicon and Intel), signed to run on this Mac,
+# and registers it so the extension's popup can turn it on and off.
 set -e
 cd "$(dirname "$0")/.."
 app="dist/YoYo Companion.app"
@@ -25,4 +26,5 @@ done
 iconutil -c icns "$set_dir" -o "$app/Contents/Resources/AppIcon.icns"
 
 codesign --force --sign - "$app"
+"$app/Contents/MacOS/YoYo Companion" --register
 echo "built $app"
