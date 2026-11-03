@@ -26,6 +26,8 @@
     popout: 'M19 11h-8v6h8zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18z',
     back: 'M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2zM10 14h2V9.41l7.29 7.3 1.42-1.42L13.41 8H18V6h-8z',
     close: 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
+    next: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
+    queue: 'M3 10h11v2H3zm0-4h11v2H3zm0 8h7v2H3zm13-1v8l6-4z',
   };
 
   const STYLE = `
@@ -63,13 +65,37 @@
     button:focus-visible { outline: 2px solid #fff; }
     svg { width: 18px; height: 18px; fill: currentColor; }
     [hidden] { display: none !important; }
-    .resize { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+    .resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 14px; height: 14px; cursor: nwse-resize; }
     .resize::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px;
       border-right: 2px solid rgba(255,255,255,.7); border-bottom: 2px solid rgba(255,255,255,.7); border-radius: 0 0 2px 0; }
     .frame.embed { background: transparent; box-shadow: none; border-radius: 0; overflow: visible; pointer-events: none; }
     .embed .bar { pointer-events: auto; display: flex; align-items: center; gap: 2px; height: ${BAR}px; box-sizing: border-box;
       padding: 2px 4px 2px 12px; background: #1c1c1e; border-radius: 12px 12px 0 0; box-shadow: 0 -2px 16px rgba(0,0,0,.25); }
     .embed .resize { pointer-events: auto; }
+    .ad-slot { position: absolute; right: 12px; bottom: 78px; display: flex; }
+    .ad-badge { padding: 4px 8px; border-radius: 4px; background: rgba(0,0,0,.6); }
+    .ad-slot .ytp-skip-ad-button { all: unset; display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 16px;
+      border-radius: 18px; background: rgba(0,0,0,.7); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
+      font: 500 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff; cursor: pointer; }
+    .ad-slot .ytp-skip-ad-button:hover { background: rgba(48,48,48,.9); }
+    .ad-slot .ytp-skip-ad-button svg { width: 20px; height: 20px; }
+    .ad-slot .ytp-skip-ad-button * { pointer-events: none; }
+    .queue { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column;
+      background: rgba(12,12,12,.96); cursor: default; }
+    .queue-head { display: flex; align-items: center; padding: 6px 6px 4px 14px; font-size: 13px; font-weight: 600; }
+    .queue-list { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 8px; }
+    .queue h4 { margin: 8px 8px 4px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; opacity: .6; }
+    .queue .item { display: flex; align-items: flex-start; gap: 10px; width: 100%; height: auto; box-sizing: border-box;
+      padding: 6px 8px; border-radius: 8px; }
+    .queue .item:hover { background: rgba(255,255,255,.1); }
+    .thumb { position: relative; flex: none; width: min(40%, 168px); aspect-ratio: 16 / 9; border-radius: 6px;
+      overflow: hidden; background: #222; }
+    .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .duration { position: absolute; right: 4px; bottom: 4px; padding: 1px 4px; border-radius: 3px; background: rgba(0,0,0,.8); font-size: 11px; }
+    .meta { flex: 1; min-width: 0; }
+    .item-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 13px; line-height: 1.3; }
+    .item-channel { margin-top: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: .65; }
+    .empty { padding: 16px; text-align: center; opacity: .7; }
     @media (prefers-reduced-motion: reduce) { .top, .bottom, .track { transition: none; } }
   `;
 
@@ -97,6 +123,9 @@
   let autoFloated = false; // floated by scrolling; scrolling back restores it
   let autoPopped = false;  // popped out by switching tabs; coming back restores it
   const pos = { x: 0, y: 0 };
+  let companionLink = null; // port to the background worker while a video is popped out
+  let sentPaused = null;
+  let skipHome = null;      // YouTube's Skip button while it's in our player, and where it goes back to
   const seen = new WeakSet();      // videos/embeds the user has actually watched on the page
   const dismissed = new WeakSet(); // closed manually; don't auto-float until scrolled back into view
 
@@ -294,6 +323,7 @@
   // ---------- putting things back ----------
 
   function teardownUI() {
+    returnSkip(); // before the frame goes, or YouTube's button would go with it
     events?.abort();
     ui?.frame.remove();
     host?.remove();
@@ -335,11 +365,16 @@
     if (manual && target.isConnected && visibleRatio(target) < 0.6) dismissed.add(target);
     mode = kind = pipWin = null;
     autoFloated = autoPopped = false;
+    updateCompanion();
+  }
+
+  function toggleVideo(v) {
+    if (v.paused || v.ended) v.play().catch(() => {});
+    else v.pause();
   }
 
   function togglePlay() {
-    if (video.paused || video.ended) video.play().catch(() => {});
-    else video.pause();
+    toggleVideo(video);
   }
 
   // ---------- in-page floating player ----------
@@ -456,7 +491,7 @@
 
     // Drag anywhere on the player (or an embed's bar); a press without movement toggles play.
     on(frame, 'pointerdown', (e) => {
-      if (e.button !== 0 || e.target.closest('button, .progress, .resize')) return;
+      if (e.button !== 0 || e.target.closest('button, .progress, .resize, .queue')) return;
       e.preventDefault();
       const sx = e.clientX, sy = e.clientY, ox = pos.x, oy = pos.y;
       let moved = false;
@@ -503,7 +538,9 @@
     });
 
     on(frame, 'keydown', (e) => {
-      if (e.key === 'Escape') restore();
+      if (e.key !== 'Escape') return;
+      if (ui.queue) closeUpNext();
+      else restore();
     });
     if (video) on(video, 'resize', () => place(pos.x, pos.y));
     on(window, 'resize', () => place(pos.x, pos.y));
@@ -558,6 +595,7 @@
     try {
       await enterVideoPip(v);
       autoPopped = auto;
+      updateCompanion();
     } catch {
       if (!auto) float(v);
     }
@@ -588,7 +626,7 @@
     const on = (target, type, fn) => target.addEventListener(type, fn, { signal: events.signal });
 
     on(frame, 'click', (e) => {
-      if (!e.target.closest('button, .progress')) togglePlay();
+      if (!e.target.closest('button, .progress, .queue')) togglePlay();
     });
     on(win, 'keydown', (e) => {
       if (e.target.closest?.('button') && (e.key === ' ' || e.key === 'Enter')) return;
@@ -596,6 +634,8 @@
       else if (e.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 5);
       else if (e.key === 'ArrowRight') video.currentTime += 5;
       else if (e.key === 'm') video.muted = !video.muted;
+      else if (e.key === 'N') youtubeNext()?.click(); // Shift+N, like YouTube
+      else if (e.key === 'Escape' && ui.queue) closeUpNext();
       else return;
       e.preventDefault();
     });
@@ -616,30 +656,40 @@
     const backBtn = button('back', 'Back to page');
     const closeBtn = button('close', 'Close (pause)');
     const playBtn = button('pause', 'Pause');
+    const nextBtn = button('next', 'Next video');
     const muteBtn = button('volume', 'Mute');
+    const queueBtn = button('queue', 'Up next');
     const popBtn = button('popout', 'Pop out (stays on top of other apps)');
     const fill = el('div', 'fill');
     const progress = el('div', 'progress', el('div', 'track', fill));
     const time = el('span', 'time');
     const stage = el('div', 'stage', video);
+    const adBadge = el('span', 'ad-badge', 'Ad');
+    const adSlot = el('div', 'ad-slot', adBadge);
     const resize = el('div', 'resize');
     popBtn.hidden = mode === 'window';
+    nextBtn.hidden = queueBtn.hidden = adBadge.hidden = true; // shown on YouTube, see updateYoutube()
+    queueBtn.setAttribute('aria-expanded', 'false');
     progress.setAttribute('role', 'slider');
     progress.setAttribute('aria-label', 'Seek');
 
     const frame = el('div', 'frame',
       stage,
       el('div', 'top', title, backBtn, closeBtn),
-      el('div', 'bottom', progress, el('div', 'row', playBtn, muteBtn, time, el('span', 'spacer'), popBtn)),
+      el('div', 'bottom', progress,
+        el('div', 'row', playBtn, nextBtn, muteBtn, time, el('span', 'spacer'), queueBtn, popBtn)),
+      adSlot,
       resize,
     );
-    ui = { frame, stage, resize, title, playBtn, muteBtn, fill, progress, time };
+    ui = { frame, stage, resize, title, playBtn, nextBtn, muteBtn, queueBtn, adSlot, adBadge, fill, progress, time, queue: null };
 
     events = new AbortController();
     const on = (target, type, fn) => target.addEventListener(type, fn, { signal: events.signal });
 
     on(playBtn, 'click', togglePlay);
+    on(nextBtn, 'click', () => youtubeNext()?.click());
     on(muteBtn, 'click', () => { video.muted = !video.muted; });
+    on(queueBtn, 'click', () => (ui.queue ? closeUpNext() : openUpNext()));
     on(backBtn, 'click', () => restore());
     on(closeBtn, 'click', () => restore({ pause: true }));
     on(popBtn, 'click', () => openPopOut());
@@ -664,6 +714,7 @@
     });
 
     for (const type of ['play', 'pause', 'ended', 'timeupdate', 'durationchange', 'volumechange']) on(video, type, sync);
+    on(video, 'loadstart', () => { returnSkip(); sync(); }); // the next ad or video
     on(video, 'loadedmetadata', updateAspect);
     on(video, 'resize', updateAspect);
     updateAspect();
@@ -703,6 +754,186 @@
     ui.time.textContent = live ? 'LIVE' : `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
     ui.fill.style.width = `${frac * 100}%`;
     ui.title.textContent = document.title;
+    updateYoutube();
+    if (mode === 'window') {
+      pipWin.document.title = document.title;
+      updateCompanion();
+    }
+  }
+
+  // ---------- YouTube: next video, up next and skipping ads ----------
+  //
+  // YouTube's player keeps working while its <video> is in ours. When you choose another
+  // video, YouTube loads it into the same element without reloading the page, so these
+  // controls just use YouTube's own Next button and links. Its Skip button only responds
+  // to real clicks, so while it's offered we borrow the button itself and show it here.
+
+  const youtubePlayer = () => (kind === 'video' && placeholder?.closest('.html5-video-player')) || null;
+  const shown = (n) => n.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? !!n.offsetParent;
+
+  function youtubeNext() {
+    const b = youtubePlayer()?.querySelector('.ytp-next-button');
+    return b?.getAttribute('href') && b.getAttribute('aria-disabled') !== 'true' ? b : null;
+  }
+
+  function updateYoutube() {
+    const player = youtubePlayer();
+    const next = youtubeNext();
+    ui.nextBtn.hidden = !next;
+    if (next) {
+      const label = next.dataset.tooltipText ? `Next: ${next.dataset.tooltipText}` : 'Next video';
+      ui.nextBtn.title = label;
+      ui.nextBtn.setAttribute('aria-label', label);
+    }
+    ui.queueBtn.hidden = !player;
+
+    const ad = !!player?.classList.contains('ad-showing');
+    const offered = ad ? [...player.querySelectorAll('.ytp-skip-ad-button')].find(shown) : null;
+    const held = skipHome?.button;
+    if (held && (!ad || offered || !ui.adSlot.contains(held) || held.style.display === 'none')) returnSkip();
+    if (offered && !skipHome) {
+      skipHome = { button: offered, parent: offered.parentNode, next: offered.nextSibling };
+      ui.adSlot.append(offered);
+    }
+    ui.adBadge.hidden = !ad || !!skipHome;
+  }
+
+  function returnSkip() {
+    if (!skipHome) return;
+    const { button: b, parent, next } = skipHome;
+    skipHome = null;
+    if (!ui.adSlot.contains(b)) return; // YouTube already took it away when the ad ended
+    if (parent.isConnected) parent.insertBefore(b, next?.parentNode === parent ? next : null);
+    else b.remove(); // YouTube has rebuilt its ad overlay
+  }
+
+  const videoIdOf = (link) => new URL(link.href, location.href).searchParams.get('v');
+  const durationIn = (n) => n?.textContent.match(/\d+(?::\d\d)+/)?.[0] ?? '';
+
+  // The rest of the playlist (or Mix) after the current video, then the recommendations.
+  function upNextVideos() {
+    const params = new URLSearchParams(location.search);
+    const ids = new Set([params.get('v')]);
+    const pick = (link, title, channel, duration) => {
+      const id = link && videoIdOf(link);
+      if (!id || ids.has(id) || !title) return [];
+      ids.add(id);
+      return [{ id, link, title, channel, duration }];
+    };
+    let queue = [];
+    if (params.has('list')) {
+      const items = [...document.querySelectorAll('ytd-playlist-panel-renderer#playlist ytd-playlist-panel-video-renderer')];
+      queue = items.slice(items.findIndex((it) => it.hasAttribute('selected')) + 1).flatMap((it) => pick(
+        it.querySelector('a#wc-endpoint, a[href*="/watch?v="]'),
+        it.querySelector('#video-title')?.textContent.trim(),
+        it.querySelector('#byline')?.textContent.trim(),
+        durationIn(it.querySelector('ytd-thumbnail-overlay-time-status-renderer, badge-shape')),
+      ));
+    }
+    const lockups = document.querySelectorAll(
+      'ytd-watch-next-secondary-results-renderer :is(yt-lockup-view-model, ytd-compact-video-renderer)');
+    const recommended = [...lockups].filter((it) => !it.closest('ytd-ad-slot-renderer')).flatMap((it) => {
+      const heading = it.querySelector('h3, #video-title');
+      return pick(
+        it.querySelector('a[href*="/watch?v="]'),
+        (heading?.getAttribute('title') || heading?.textContent || '').trim(),
+        it.querySelector('[class*="MetadataRow"], [class*="metadata-row"], #channel-name')?.textContent.trim(),
+        durationIn(it.querySelector('badge-shape, ytd-thumbnail-overlay-time-status-renderer')),
+      );
+    });
+    return { queue, recommended };
+  }
+
+  function openUpNext() {
+    const { queue, recommended } = upNextVideos();
+    const list = el('div', 'queue-list');
+    for (const [heading, videos] of [['Queue', queue], ['Recommended', recommended]]) {
+      if (videos.length) list.append(el('h4', null, heading), ...videos.map(upNextItem));
+    }
+    if (!list.childElementCount) list.append(el('div', 'empty', 'Nothing up next yet. Try again once the page has loaded.'));
+    const closeBtn = button('close', 'Close');
+    closeBtn.addEventListener('click', closeUpNext, { signal: events.signal });
+    ui.queue = el('div', 'queue', el('div', 'queue-head', el('span', 'title', 'Up next'), closeBtn), list);
+    ui.frame.append(ui.queue);
+    ui.queueBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeUpNext() {
+    ui.queue?.remove();
+    ui.queue = null;
+    ui.queueBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function upNextItem({ id, link, title, channel, duration }) {
+    const img = el('img');
+    img.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg`;
+    img.alt = '';
+    img.loading = 'lazy';
+    const thumb = el('div', 'thumb', img);
+    if (duration) thumb.append(el('span', 'duration', duration));
+    const item = el('button', 'item', thumb, el('div', 'meta', el('div', 'item-title', title), el('div', 'item-channel', channel || '')));
+    item.type = 'button';
+    item.title = title;
+    item.addEventListener('click', () => {
+      closeUpNext();
+      // YouTube may have redrawn its list since this one was made.
+      const target = link.isConnected ? link : document.querySelector(`a[href*="v=${CSS.escape(id)}"]`);
+      if (target) target.click(); // YouTube switches videos without reloading the page
+      else location.assign(`/watch?v=${encodeURIComponent(id)}`);
+    }, { signal: events.signal });
+    return item;
+  }
+
+  // ---------- play/pause from the Mac companion app ----------
+  //
+  // The companion's floating copy is only a picture, so its clicks have to reach the real
+  // video. While a video is popped out, this frame keeps a port open to the background
+  // worker, which relays commands and play/pause state to and from the app.
+
+  const companionSupported = api.runtime.getManifest().permissions?.includes('nativeMessaging');
+
+  function poppedOutVideo() {
+    if (mode === 'window') return video;
+    const el = videoInPip();
+    if (!el) return null;
+    // For a video inside a shadow root, the document only reports the root's host.
+    return el.localName === 'video' ? el : scan().videos.find((v) => v.matches(':picture-in-picture')) ?? null;
+  }
+
+  function closeCompanionLink() {
+    try {
+      companionLink?.disconnect();
+    } catch {
+      // The extension was reloaded; the port is already gone.
+    }
+    companionLink = null;
+    sentPaused = null;
+  }
+
+  function updateCompanion() {
+    if (!companionSupported) return;
+    const v = poppedOutVideo();
+    if (!v) return closeCompanionLink();
+    try {
+      if (!companionLink) {
+        companionLink = api.runtime.connect({ name: 'companion' });
+        companionLink.onMessage.addListener(({ command }) => {
+          const target = poppedOutVideo();
+          if (command === 'togglePlay' && target) toggleVideo(target);
+        });
+        companionLink.onDisconnect.addListener(() => {
+          companionLink = null;
+          sentPaused = null;
+        });
+      }
+      const paused = v.paused || v.ended;
+      if (paused !== sentPaused) {
+        companionLink.postMessage({ paused });
+        sentPaused = paused;
+      }
+    } catch {
+      closeCompanionLink();
+    }
   }
 
   // ---------- automatic triggers (top frame) ----------
@@ -763,7 +994,11 @@
   // Media events don't bubble, so listen in the capture phase.
   for (const type of ['play', 'pause', 'ended', 'volumechange', 'loadedmetadata', 'emptied',
     'enterpictureinpicture', 'leavepictureinpicture']) {
-    document.addEventListener(type, () => (isTop ? onScroll() : scheduleReport()), { capture: true });
+    document.addEventListener(type, () => {
+      if (companionLink || type === 'enterpictureinpicture') updateCompanion();
+      if (isTop) onScroll();
+      else scheduleReport();
+    }, { capture: true });
   }
   scheduleReport();
 

@@ -1,11 +1,22 @@
 #!/bin/sh
 # Builds dist/YoYo Companion.app (Apple silicon and Intel), signed to run on this Mac,
 # and registers it so the extension's popup can turn it on and off.
+#
+# macOS ties the Screen Recording permission to this exact build, even when it's signed
+# with a developer certificate, so every rebuild has to be allowed again.
 set -e
 cd "$(dirname "$0")/.."
 app="dist/YoYo Companion.app"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+
+# Replace a running copy, and start the new one afterwards.
+was_running=""
+if pgrep -x "YoYo Companion" >/dev/null; then
+  was_running=1
+  pkill -x "YoYo Companion"
+  sleep 1
+fi
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -27,4 +38,5 @@ iconutil -c icns "$set_dir" -o "$app/Contents/Resources/AppIcon.icns"
 
 codesign --force --sign - "$app"
 "$app/Contents/MacOS/YoYo Companion" --register
+[ -n "$was_running" ] && open -g "$app"
 echo "built $app"

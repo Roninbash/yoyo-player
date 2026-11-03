@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>First video - YouTube</title><link rel="stylesheet" href="page.css"></head>
+<body>
+  <!-- The parts of a YouTube watch page that YoYo Player uses, with the same names. -->
+  <main>
+    <div id="movie_player" class="html5-video-player">
+      <div class="html5-video-container"><video class="video-stream html5-main-video"></video></div>
+      <div class="video-ads ytp-ad-module">
+        <button class="ytp-skip-ad-button" style="display: none;">
+          <div class="ytp-skip-ad-button__text">Skip</div>
+          <span class="ytp-skip-ad-button__icon"><svg viewBox="0 0 24 24" width="24" height="24"><path d="M5 18l8.5-6L5 6v12zM15 6v12h2V6z"/></svg></span>
+        </button>
+      </div>
+      <a class="ytp-next-button" style="display: none;" href="/watch?v=second00002" data-tooltip-text="Second video"></a>
+    </div>
+    <ytd-watch-next-secondary-results-renderer>
+      <yt-lockup-view-model>
+        <a href="/watch?v=second00002&amp;pp=x">thumbnail</a>
+        <h3 title="Second video"><a href="/watch?v=second00002&amp;pp=x">Second video</a></h3>
+        <div class="ytContentMetadataViewModelMetadataRow">Channel Two</div>
+        <badge-shape>4:27</badge-shape>
+      </yt-lockup-view-model>
+      <yt-lockup-view-model>
+        <a href="/watch?v=third000003">thumbnail</a>
+        <h3 title="Third video"><a href="/watch?v=third000003">Third video</a></h3>
+        <div class="ytContentMetadataViewModelMetadataRow">Channel Three</div>
+        <badge-shape>12:05</badge-shape>
+      </yt-lockup-view-model>
+      <ytd-ad-slot-renderer>
+        <yt-lockup-view-model>
+          <a href="/watch?v=sponsored01">thumbnail</a>
+          <h3 title="Sponsored video">Sponsored video</h3>
+        </yt-lockup-view-model>
+      </ytd-ad-slot-renderer>
+    </ytd-watch-next-secondary-results-renderer>
+    <div class="spacer">Comments…</div>
+  </main>
+  <script src="video.js"></script>
+  <script src="youtube.js"></script>
+</body>
+</html>
