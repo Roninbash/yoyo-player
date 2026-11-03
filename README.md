@@ -7,6 +7,39 @@ A browser extension for Chrome and Safari that pops a website's video out into a
 - **Pop out:** an always-on-top window that floats over your other apps and follows you between desktops, even when the browser is in the background. On Mac, full-screen apps need the small [YoYo Companion](#full-screen-apps-on-mac-yoyo-companion) app as well.
 - **Float in page:** a mini player inside the tab that you can drag and resize anywhere on the page.
 
+## Install
+
+YoYo Player isn't in an extension store yet, so you load it from this repository. You need [Node 18+](https://nodejs.org). For Safari you also need Xcode 15+ on a Mac.
+
+```
+git clone https://github.com/Roninbash/yoyo-player.git
+cd yoyo-player
+npm install
+npm run build
+```
+
+### Add to Chrome (also Edge, Brave and Arc)
+
+1. Open `chrome://extensions` (`edge://extensions` in Edge, `brave://extensions` in Brave).
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `dist/chrome` folder.
+4. Click the puzzle-piece icon in the toolbar and pin **YoYo Player**.
+5. Open a page with a video and press `Alt+Shift+P` (`⌥⇧P` on Mac), or click the icon and choose **Pop out**.
+
+To update, run `git pull` and `npm run build`, then click the reload icon on the extension's card.
+
+### Add to Safari (Mac)
+
+1. Run `npm run safari`, or open `safari/YoYo Player/YoYo Player.xcodeproj` in Xcode and press **Run** (⌘R). This installs the YoYo Player app and its extension.
+2. In Safari, open **Settings → Advanced** and turn on **Show features for web developers**.
+3. Open **Settings → Developer** and turn on **Allow unsigned extensions**. Safari turns this off every time it quits, so repeat this after restarting Safari.
+4. Open **Settings → Extensions**, turn on **YoYo Player**, and allow it on all websites (or the sites you want).
+5. Open a page with a video and press `⌥⇧P`, or click the icon and choose **Pop out**.
+
+To update, run `git pull`, then `npm run safari` again.
+
+See [Chrome vs Safari](#chrome-vs-safari) for what differs between the two.
+
 ## Using it
 
 | | Pop out | Float in page |
@@ -16,6 +49,12 @@ A browser extension for Chrome and Safari that pops a website's video out into a
 | Move / resize | Like any window | Drag anywhere; resize from the bottom-right corner |
 
 The floating player has play/pause (or click the video), a seek bar, mute, **Back to page**, and **✕** (puts the video back and pauses it). The in-page player has a pop-out button too. In the pop-out window, `Space`/`K` plays or pauses, `←`/`→` skip 5 seconds and `M` mutes. `Esc` puts the in-page player back.
+
+On YouTube the player also has:
+
+- **Next** (`⇧N` in the pop-out window), which plays the next video in the playlist, or the one YouTube would autoplay.
+- **Up next** (the list button, bottom right), which lists the rest of the playlist or Mix and the recommended videos. Click one to play it right there, without going back to the tab.
+- **Skip** during an ad, as soon as YouTube offers to skip it. Until then the player shows **Ad**. Ads that YouTube doesn't let you skip play as normal.
 
 Both automatic modes can be turned off in the popup.
 
@@ -135,6 +174,7 @@ You can also distribute outside the App Store by choosing **Developer ID** when 
 
 - An embed can't float in the page if the site has wrapped it in certain visual effects (CSS transforms or filters), because those stop it being pinned in place. Pop out still works.
 - While the video is out of the page, the site's own controls (like YouTube's control bar) aren't shown on it. The site's keyboard shortcuts still work in its tab.
+- Next, Up next and Skip only work on YouTube, and they rely on how YouTube builds its page. YouTube changes that from time to time, so they may stop appearing until the extension is updated. The rest of the player keeps working.
 - The tests can't confirm that a toolbar click or shortcut counts as a user click in the page (the test tool fakes that automatically). Test this in a real browser before each release.
 
 ## License
