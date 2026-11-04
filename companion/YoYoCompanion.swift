@@ -181,7 +181,8 @@ private final class MirrorPanel: NSPanel {
                styleMask: [.borderless, .nonactivatingPanel, .resizable], backing: .buffered, defer: false)
     level = .floating
     // The non-activating style is what lets it appear on another app's full-screen Space.
-    collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+    // Join other apps' Spaces as well as regular desktops, then layer above their full-screen window.
+    collectionBehavior = [.canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary, .ignoresCycle]
     hidesOnDeactivate = false
     isOpaque = false
     backgroundColor = .clear

@@ -136,8 +136,17 @@
 
   // Custom player elements often keep their <video> in a shadow root. Chrome lets
   // extensions see closed ones too.
-  const shadowOf = (n) => n.shadowRoot
-    ?? (n.localName.includes('-') ? api.dom?.openOrClosedShadowRoot?.(n) ?? null : null);
+  function shadowOf(n) {
+    if (n.shadowRoot) return n.shadowRoot;
+    if (!n.localName.includes('-')) return null;
+    try {
+      // This extension API can throw after an extension reload invalidates the
+      // content-script context. The page is still alive, so skip closed roots.
+      return api.dom?.openOrClosedShadowRoot?.(n) ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   // Walking the whole DOM isn't free, so the scroll handler reuses the result for a second.
   let found = { videos: [], frames: [] };
